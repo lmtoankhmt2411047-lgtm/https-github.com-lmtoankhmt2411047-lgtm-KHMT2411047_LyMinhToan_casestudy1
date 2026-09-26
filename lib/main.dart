@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-
+import 'screens/add_transaction_screen.dart';
+import 'screens/edit_transaction_screen.dart';
 void main() {
   runApp(const MyApp());
 }
@@ -105,9 +106,9 @@ class WelcomeScreen extends StatelessWidget {
                 width: double.infinity,
                 height: 52,
                 child: ElevatedButton(
-                  onPressed: () {
+                    onPressed: () { Navigator.push( context, MaterialPageRoute(builder: (_) => const AddTransactionScreen()), ); }
                     // Thao tác khi bấm nút Bắt đầu
-                  },
+                  ,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF1E88E5),
                     shape: RoundedRectangleBorder(
@@ -123,6 +124,22 @@ class WelcomeScreen extends StatelessWidget {
                       color: Colors.white,
                     ),
                   ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: OutlinedButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => EditTransactionScreen(date: DateTime(2025, 4, 12)),
+                      ),
+                    );
+                  },
+                  child: const Text('Sửa giao dịch (demo)'),
                 ),
               ),
             ],
