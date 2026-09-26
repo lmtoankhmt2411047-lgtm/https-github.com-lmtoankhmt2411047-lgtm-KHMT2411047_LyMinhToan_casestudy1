@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'screens/add_transaction_screen.dart';
 import 'screens/edit_transaction_screen.dart';
+import 'screens/dashboard_screen.dart';
 void main() {
   runApp(const MyApp());
 }
@@ -140,6 +141,20 @@ class WelcomeScreen extends StatelessWidget {
                     );
                   },
                   child: const Text('Sửa giao dịch (demo)'),
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: OutlinedButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const DashboardScreen()),
+                    );
+                  },
+                  child: const Text('Dashboard (demo)'),
                 ),
               ),
             ],
