@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-
+import '../db/database_helper.dart';
+import '../models/transaction_model.dart';
 /// Màn hình Thêm giao dịch.
 /// Dùng: Navigator.push(context, MaterialPageRoute(builder: (_) => const AddTransactionScreen()));
 class AddTransactionScreen extends StatefulWidget {
@@ -74,7 +75,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     );
   }
 
-  void _save() {
+  Future<void> _save() async {
     final amount = amountController.text.trim();
     if (amount.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -89,6 +90,15 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       'date': selectedDate,
       'note': noteController.text.trim(),
     };
+    await DatabaseHelper.instance.insertTransaction(
+      TransactionModel(
+        categoryId: 1,
+        amount: int.parse(amount),
+        type: isExpense ? 'expense' : 'income',
+        date: selectedDate,
+        note: noteController.text,
+      ),
+    );
     Navigator.pop(context, result);
   }
 
