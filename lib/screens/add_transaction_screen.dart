@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
 import '../db/database_helper.dart';
+import '../models/category_model.dart';
 import '../models/transaction_model.dart';
+
 /// Màn hình Thêm giao dịch.
-/// Dùng: Navigator.push(context, MaterialPageRoute(builder: (_) => const AddTransactionScreen()));
+/// Danh mục lấy từ SQLite, bấm Lưu sẽ ghi vào database rồi trả về true.
 class AddTransactionScreen extends StatefulWidget {
   const AddTransactionScreen({super.key});
 
@@ -11,27 +15,49 @@ class AddTransactionScreen extends StatefulWidget {
 }
 
 class _AddTransactionScreenState extends State<AddTransactionScreen> {
+  static const Color bluePrimary = Color(0xFF2F6FED);
+  static const Color redPrimary = Color(0xFFFA5A5A);
+  static const Color borderGray = Color(0xFFE3E5E8);
+  static const Color textGray = Color(0xFF6B7280);
+
   bool isExpense = true; // true = Chi tiêu, false = Thu nhập
   DateTime selectedDate = DateTime.now();
 
   final TextEditingController amountController = TextEditingController();
   final TextEditingController noteController = TextEditingController();
 
-  final List<Map<String, dynamic>> categories = const [
-    {'name': 'Ăn uống', 'icon': Icons.restaurant, 'color': Color(0xFFFA5A5A)},
-    {'name': 'Di chuyển', 'icon': Icons.directions_car, 'color': Color(0xFF4C9AFF)},
-    {'name': 'Mua sắm', 'icon': Icons.shopping_bag, 'color': Color(0xFFFFA94D)},
-    {'name': 'Hóa đơn', 'icon': Icons.receipt_long, 'color': Color(0xFF9C88FF)},
-    {'name': 'Giải trí', 'icon': Icons.movie, 'color': Color(0xFF63E6BE)},
-    {'name': 'Khác', 'icon': Icons.more_horiz, 'color': Color(0xFFADB5BD)},
-  ];
+  List<CategoryModel> categories = [];
+  CategoryModel? selectedCategory;
 
-  late Map<String, dynamic> selectedCategory = categories.first;
+  @override
+  void initState() {
+    super.initState();
+    _loadCategories();
+  }
 
-  static const Color bluePrimary = Color(0xFF2F6FED);
-  static const Color redPrimary = Color(0xFFFA5A5A);
-  static const Color borderGray = Color(0xFFE3E5E8);
-  static const Color textGray = Color(0xFF6B7280);
+  @override
+  void dispose() {
+    amountController.dispose();
+    noteController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadCategories() async {
+    final list = await DatabaseHelper.instance.getCategories(
+      type: isExpense ? 'expense' : 'income',
+    );
+    if (!mounted) return;
+    setState(() {
+      categories = list;
+      selectedCategory = list.isNotEmpty ? list.first : null;
+    });
+  }
+
+  void _selectType(bool expense) {
+    if (isExpense == expense) return;
+    setState(() => isExpense = expense);
+    _loadCategories();
+  }
 
   String get formattedDate =>
       '${selectedDate.day.toString().padLeft(2, '0')}/${selectedDate.month.toString().padLeft(2, '0')}/${selectedDate.year}';
@@ -47,25 +73,26 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   }
 
   void _pickCategory() {
+    if (categories.isEmpty) return;
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) {
+      builder: (sheetContext) {
         return SafeArea(
           child: ListView(
             shrinkWrap: true,
             children: categories.map((cat) {
               return ListTile(
                 leading: CircleAvatar(
-                  backgroundColor: (cat['color'] as Color).withOpacity(0.15),
-                  child: Icon(cat['icon'] as IconData, color: cat['color'] as Color),
+                  backgroundColor: cat.color.withValues(alpha: 0.15),
+                  child: Icon(cat.icon, color: cat.color),
                 ),
-                title: Text(cat['name'] as String),
+                title: Text(cat.name),
                 onTap: () {
                   setState(() => selectedCategory = cat);
-                  Navigator.pop(context);
+                  Navigator.pop(sheetContext);
                 },
               );
             }).toList(),
@@ -76,34 +103,40 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   }
 
   Future<void> _save() async {
-    final amount = amountController.text.trim();
-    if (amount.isEmpty) {
+    final amount =
+        int.tryParse(amountController.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+    if (amount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Vui lòng nhập số tiền')),
       );
       return;
     }
-    final result = {
-      'type': isExpense ? 'expense' : 'income',
-      'category': selectedCategory['name'],
-      'amount': amount,
-      'date': selectedDate,
-      'note': noteController.text.trim(),
-    };
+    if (selectedCategory == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Vui lòng chọn danh mục')),
+      );
+      return;
+    }
+
     await DatabaseHelper.instance.insertTransaction(
       TransactionModel(
-        categoryId: 1,
-        amount: int.parse(amount),
+        categoryId: selectedCategory!.id!,
+        amount: amount,
         type: isExpense ? 'expense' : 'income',
         date: selectedDate,
-        note: noteController.text,
+        note: noteController.text.trim(),
       ),
     );
-    Navigator.pop(context, result);
+
+    if (!mounted) return;
+    Navigator.pop(context, true);
   }
 
   @override
   Widget build(BuildContext context) {
+    final cat = selectedCategory;
+    final catColor = cat?.color ?? textGray;
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -122,51 +155,18 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Toggle Chi tiêu / Thu nhập
               Row(
                 children: [
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => setState(() => isExpense = true),
-                      child: Container(
-                        height: 48,
-                        margin: const EdgeInsets.only(right: 8),
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: isExpense ? redPrimary : Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: isExpense ? redPrimary : borderGray),
-                        ),
-                        child: Text(
-                          'Chi tiêu',
-                          style: TextStyle(
-                            color: isExpense ? Colors.white : textGray,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
+                  _typeTab(
+                    text: 'Chi tiêu',
+                    selected: isExpense,
+                    onTap: () => _selectType(true),
+                    margin: const EdgeInsets.only(right: 8),
                   ),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => setState(() => isExpense = false),
-                      child: Container(
-                        height: 48,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: !isExpense ? redPrimary : Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: !isExpense ? redPrimary : borderGray),
-                        ),
-                        child: Text(
-                          'Thu nhập',
-                          style: TextStyle(
-                            color: !isExpense ? Colors.white : textGray,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
+                  _typeTab(
+                    text: 'Thu nhập',
+                    selected: !isExpense,
+                    onTap: () => _selectType(false),
                   ),
                 ],
               ),
@@ -188,12 +188,11 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                     children: [
                       CircleAvatar(
                         radius: 14,
-                        backgroundColor: (selectedCategory['color'] as Color).withOpacity(0.15),
-                        child: Icon(selectedCategory['icon'] as IconData,
-                            size: 16, color: selectedCategory['color'] as Color),
+                        backgroundColor: catColor.withValues(alpha: 0.15),
+                        child: Icon(cat?.icon ?? Icons.category, size: 16, color: catColor),
                       ),
                       const SizedBox(width: 10),
-                      Expanded(child: Text(selectedCategory['name'] as String)),
+                      Expanded(child: Text(cat?.name ?? 'Chọn danh mục')),
                       const Icon(Icons.keyboard_arrow_down, color: textGray),
                     ],
                   ),
@@ -206,6 +205,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               TextField(
                 controller: amountController,
                 keyboardType: TextInputType.number,
+                inputFormatters: [_ThousandsSeparatorFormatter()],
                 decoration: InputDecoration(
                   hintText: 'Nhập số tiền',
                   suffixText: 'đ',
@@ -278,8 +278,64 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     );
   }
 
+  Widget _typeTab({
+    required String text,
+    required bool selected,
+    required VoidCallback onTap,
+    EdgeInsets margin = EdgeInsets.zero,
+  }) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          height: 48,
+          margin: margin,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: selected ? redPrimary : Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: selected ? redPrimary : borderGray),
+          ),
+          child: Text(
+            text,
+            style: TextStyle(
+              color: selected ? Colors.white : textGray,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _label(String text) => Text(
-        text,
-        style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
-      );
+    text,
+    style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
+  );
+}
+
+/// Thêm dấu chấm ngăn cách hàng nghìn khi gõ số tiền: 100000 -> 100.000
+String _groupDigits(String digits) {
+  final buf = StringBuffer();
+  for (int i = 0; i < digits.length; i++) {
+    if (i > 0 && (digits.length - i) % 3 == 0) buf.write('.');
+    buf.write(digits[i]);
+  }
+  return buf.toString();
+}
+
+class _ThousandsSeparatorFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+      TextEditingValue oldValue,
+      TextEditingValue newValue,
+      ) {
+    final digits = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.isEmpty) return const TextEditingValue(text: '');
+    final text = _groupDigits(digits);
+    return TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+  }
 }
