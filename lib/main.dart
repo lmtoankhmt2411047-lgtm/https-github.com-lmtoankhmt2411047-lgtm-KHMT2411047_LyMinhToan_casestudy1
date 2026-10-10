@@ -107,7 +107,7 @@ class WelcomeScreen extends StatelessWidget {
                 width: double.infinity,
                 height: 52,
                 child: ElevatedButton(
-                    onPressed: () { Navigator.push( context, MaterialPageRoute(builder: (_) => const AddTransactionScreen()), ); }
+                    onPressed: () { Navigator.push( context, MaterialPageRoute(builder: (_) => const DashboardScreen()), ); }
                     // Thao tác khi bấm nút Bắt đầu
                   ,
                   style: ElevatedButton.styleFrom(
@@ -125,36 +125,6 @@ class WelcomeScreen extends StatelessWidget {
                       color: Colors.white,
                     ),
                   ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: OutlinedButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => EditTransactionScreen(date: DateTime(2025, 4, 12)),
-                      ),
-                    );
-                  },
-                  child: const Text('Sửa giao dịch (demo)'),
-                ),
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: OutlinedButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const DashboardScreen()),
-                    );
-                  },
-                  child: const Text('Dashboard (demo)'),
                 ),
               ),
             ],
